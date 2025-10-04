@@ -233,27 +233,30 @@ timeManage.appendChild(table);
 
 
 
-button.addEventListener("click", function() {
+// Load stored expenses on page load
+document.addEventListener("DOMContentLoaded", () => {
+    let storedExpenses = JSON.parse(localStorage.getItem("expenses")) || [];
+    storedExpenses.forEach(exp => addExpenseRow(exp, false));
+});
 
-    let amountVal = parseFloat(document.getElementById("amount").value);
-    let dateVal = document.getElementById("date").value;
-    let categoryVal = document.getElementById("option").value;
-    let noteVal = document.getElementById("text").value;
+// Update localStorage
+function saveExpensesToStorage(expenses) {
+    localStorage.setItem("expenses", JSON.stringify(expenses));
+}
 
-    if (isNaN(amountVal) || !dateVal || !categoryVal) {
-        alert("Please fill all required fields correctly.");
-        return;
-    }
+// Add expense row and update summary
+function addExpenseRow({
+    amount,
+    date,
+    category,
+    note
+}, save = true) {
+    if (tbody.contains(emptyRow)) tbody.removeChild(emptyRow);
 
-    let formattedDate = new Date(dateVal).toLocaleDateString("en-GB");
-
-    if (tbody.contains(emptyRow)) {
-        tbody.removeChild(emptyRow);
-    }
-
+    let formattedDate = new Date(date).toLocaleDateString("en-GB");
     let newRow = document.createElement("tr");
 
-    [formattedDate, categoryVal, noteVal, `${amountVal.toFixed(2)}`].forEach(text => {
+    [formattedDate, category, note, amount.toFixed(2)].forEach(text => {
         let td = document.createElement("td");
         td.textContent = text;
         newRow.appendChild(td);
@@ -273,45 +276,77 @@ button.addEventListener("click", function() {
     newRow.appendChild(actionTd);
     tbody.appendChild(newRow);
 
-    // Update
-    updateSummary(amountVal, dateVal, categoryVal);
+    updateSummary(amount, date, category);
+
+    // Save to localStorage
+    if (save) {
+        let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+        expenses.push({
+            amount,
+            date,
+            category,
+            note
+        });
+        saveExpensesToStorage(expenses);
+    }
+
+    // Delete
+    deleteBtn.addEventListener("click", function() {
+        updateSummary(-amount, date, category);
+        tbody.removeChild(newRow);
+
+        // Remove from localStorage
+        let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+        expenses = expenses.filter(e => !(e.amount === amount && e.date === date && e.category === category && e.note === note));
+        saveExpensesToStorage(expenses);
+
+        if (!tbody.children.length) tbody.appendChild(emptyRow);
+    });
+
+    // Edit
+    editBtn.addEventListener("click", function() {
+        document.getElementById("amount").value = amount;
+        document.getElementById("date").value = date;
+        document.getElementById("option").value = category;
+        document.getElementById("text").value = note;
+
+        updateSummary(-amount, date, category);
+        tbody.removeChild(newRow);
+
+        let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+        expenses = expenses.filter(e => !(e.amount === amount && e.date === date && e.category === category && e.note === note));
+        saveExpensesToStorage(expenses);
+
+        if (!tbody.children.length) tbody.appendChild(emptyRow);
+    });
+}
+
+// Button click handler
+button.addEventListener("click", function() {
+    let amountVal = parseFloat(document.getElementById("amount").value);
+    let dateVal = document.getElementById("date").value;
+    let categoryVal = document.getElementById("option").value;
+    let noteVal = document.getElementById("text").value;
+
+    if (isNaN(amountVal) || !dateVal || !categoryVal) {
+        alert("Please fill all required fields correctly.");
+        return;
+    }
+
+    addExpenseRow({
+        amount: amountVal,
+        date: dateVal,
+        category: categoryVal,
+        note: noteVal
+    });
 
     // Reset form
     document.getElementById("amount").value = "";
     document.getElementById("date").value = "";
     document.getElementById("option").value = "food";
     document.getElementById("text").value = "";
-
-    //DELETE
-    deleteBtn.addEventListener("click", function() {
-        let amt = parseFloat(newRow.children[3].textContent);
-        let cat = newRow.children[1].textContent;
-        let rawDate = new Date(newRow.children[0].textContent.split("/").reverse().join("-"));
-
-        updateSummary(-amt, rawDate, cat);
-        tbody.removeChild(newRow);
-    });
-
-    // EDIT 
-    editBtn.addEventListener("click", function() {
-        let oldAmt = parseFloat(newRow.children[3].textContent);
-        let oldDate = newRow.children[0].textContent.split("/").reverse().join("-");
-        let oldCat = newRow.children[1].textContent;
-        let oldNote = newRow.children[2].textContent;
-
-        // Pre-fill form
-        document.getElementById("amount").value = oldAmt;
-        document.getElementById("date").value = oldDate;
-        document.getElementById("option").value = oldCat;
-        document.getElementById("text").value = oldNote;
-
-        // Subtract old values immediately
-        updateSummary(-oldAmt, oldDate, oldCat);
-
-        // Remove old row
-        tbody.removeChild(newRow);
-    });
 });
+
 
 
 function updateSummary(amountVal, dateVal, categoryVal) {
